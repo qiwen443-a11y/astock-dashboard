@@ -615,7 +615,21 @@ function renderHeader(){
   if(s.scan_time)   bits.push(`最后扫描 <b>${esc(s.scan_time)}</b>`);
   if(m.pool_stats)  bits.push(`标的池 <b>${m.pool_stats.total}</b> 只`);
   if(m.generated_at)bits.push(`行情缓存 <b>${esc(m.generated_at.slice(5,16))}</b>`);
-  document.getElementById('hdr-meta').innerHTML = bits.join('');
+  // 数据新鲜度徽标
+  let badge='';
+  if(s.signal_date){
+    const sd=s.signal_date.replace(/-/g,'');
+    const t=new Date();
+    const td=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
+    if(sd===td){
+      badge=`<span style="margin-left:8px;padding:2px 9px;border-radius:10px;font-size:12px;background:#1f6f3f;color:#b8f5cf">● 今日数据已更新</span>`;
+    }else{
+      let diff=0;
+      try{ diff=Math.max(0,Math.round((new Date(td)-new Date(sd))/86400000)); }catch(e){}
+      badge=`<span style="margin-left:8px;padding:2px 9px;border-radius:10px;font-size:12px;background:#5a3a12;color:#ffcf8a">● 数据滞后 ${diff} 天（行情源暂不可用，保留上次有效信号）</span>`;
+    }
+  }
+  document.getElementById('hdr-meta').innerHTML = bits.join('') + badge;
 }
 
 function renderAll(){ renderSig(); renderPerf(); renderTrades(); renderMarket(); renderEtf(); renderBuyAdvice(); }
