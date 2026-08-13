@@ -251,7 +251,6 @@ svg text { font-family:'Segoe UI','Microsoft YaHei',sans-serif; }
     <button class="tab"     data-t="mkt"   onclick="switchTab('mkt')">🌐 市场概况</button>
     <button class="tab"     data-t="doc"   onclick="switchTab('doc')">📖 策略说明</button>
     <button class="tab"     data-t="etf"   onclick="switchTab('etf')">📊 ETF策略</button>
-    <button class="tab"     data-t="reco"  onclick="switchTab('reco')">🧠 智能推荐</button>
   </div>
 
   <div class="pane on" id="p-sig"><div class="loading"><div class="spin"></div><div style="margin-top:12px">加载信号数据...</div></div></div>
@@ -260,7 +259,6 @@ svg text { font-family:'Segoe UI','Microsoft YaHei',sans-serif; }
   <div class="pane" id="p-trade"></div>
   <div class="pane" id="p-mkt"></div>
   <div class="pane" id="p-etf"></div>
-  <div class="pane" id="p-reco"></div>
   <div class="pane" id="p-doc">
 <div class="card"><div class="card-t">决策流程</div>
 <svg viewBox="0 0 1000 330" width="100%" style="display:block">
@@ -634,7 +632,7 @@ function renderHeader(){
   document.getElementById('hdr-meta').innerHTML = bits.join('') + badge;
 }
 
-function renderAll(){ renderSig(); renderPerf(); renderTrades(); renderMarket(); renderEtf(); renderBuyAdvice(); renderReco(); }
+function renderAll(){ renderSig(); renderPerf(); renderTrades(); renderMarket(); renderEtf(); renderBuyAdvice(); }
 
 function switchTab(t){
   curTab=t;
@@ -739,28 +737,52 @@ function renderSig(){
         <div class="tl-n"><div class="tl-dot">💰</div><div class="tl-d">${esc(md(dts[2]))} 09:30</div><div class="tl-l">开盘卖出</div></div>
       </div></div>`;
 
-    h+=`<div class="sec-t">📢 明日买入清单 <span class="sub" style="font-weight:500;color:var(--mute);font-size:12px">
-      ${esc(d.signal_date)} 收盘信号 · 从 ${d.candidate_count||sigs.length} 个候选中优选 ${sigs.length} 只</span></div>`;
+    /* 三维加权打分排名：直接并入今日信号，按总分排序 */
+    const recoMap={};
+    (DATA.reco&&DATA.reco.records||[]).forEach(r=>{recoMap[r.code]=r;});
+    const ranked=sigs.map(s=>({s,r:recoMap[s.code]})).sort((a,b)=>(b.r?b.r.total:-1)-(a.r?a.r.total:-1));
+    const _w=(DATA.reco&&DATA.reco.weights)||{tech:0.4,sent:0.35,fund:0.25};
+    const _wi=k=>Math.round((_w[k]||0)*100);
+    h+=`<div class="sec-t">🧠 明日买入清单 · 三维加权打分排名 <span class="sub" style="font-weight:500;color:var(--mute);font-size:12px">
+      ${esc(d.signal_date)} 收盘信号 · 优选 ${sigs.length} 只 · 权重 技术${_wi('tech')}% / 情绪${_wi('sent')}% / 基本面${_wi('fund')}%${DATA.reco&&DATA.reco.as_of?' · 数据截至 '+esc(DATA.reco.as_of):''}</span></div>`;
     h+='<div class="sig-grid">';
-    sigs.forEach((s,i)=>{
+    ranked.forEach(({s,r},i)=>{
       const pre=s.code.startsWith('6')?'sh':'sz';
       const isB=s.strategy==='breakout';
-      h+=`<div class="sig ${isB?'':'pull'}">
-        <div class="sig-rank">TOP ${i+1}</div>
+      const total=r?r.total:null;
+      const lvl=total!=null?(total>=70?'强推':(total>=55?'关注':'谨慎')):'';
+      const flagHtml=r?(r.flags||[]).map(f=>`<div class="warnbox" style="margin:6px 0;padding:7px 9px;font-size:11.5px">${esc(f)}</div>`).join(''):'';
+      const reasons=r?(r.reasons||[]).slice(0,3).map(x=>`<li>${esc(x)}</li>`).join(''):'';
+      const bar=(label,val,c)=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11.5px">
+        <span style="width:30px;color:var(--mute)">${label}</span>
+        <div style="flex:1;height:8px;background:#eef0f5;border-radius:5px;overflow:hidden">
+          <div style="width:${Math.max(0,Math.min(100,val))}%;height:100%;background:${c}"></div></div>
+        <span style="width:26px;text-align:right;font-weight:700;font-size:11px">${val.toFixed(0)}</span></div>`;
+      const net5d=r&&r.metrics?r.metrics.net_5d:null;
+      h+=`<div class="sig ${isB?'':'pull'}" style="${r&&r.total<55?'border-left:4px solid #8892a4':(r&&r.total>=55?'border-left:4px solid #e5384a':'')}">
+        <div class="sig-rank">${total!=null?('★ '+total.toFixed(1)):'TOP '+(i+1)}</div>
         <div class="sig-h">
           <div><div class="sig-code">${pre}${esc(s.code)}</div><div class="sig-name">${esc(s.name)}</div></div>
-          <div><div class="sig-p ${cls(s.pct_chg)}">${nice(s.close)}</div>
-               <div class="sig-pct ${cls(s.pct_chg)}">${sgn(s.pct_chg)}%</div></div>
+          <div style="text-align:right">
+            <div class="sig-p ${cls(s.pct_chg)}">${nice(s.close)}</div>
+            <div class="sig-pct ${cls(s.pct_chg)}">${sgn(s.pct_chg)}%</div>
+            ${total!=null?`<div class="pill ${total>=70?'red':(total>=55?'yellow':'gray')}" style="margin-top:3px">${lvl}</div>`:''}
+          </div>
         </div>
         <div class="sig-d">${esc(s.signal_desc)}</div>
-        <div style="margin-top:9px"><span class="tag ${isB?'bo':'pb'}">${isB?'量价突破':'缩量回踩'}</span></div>
+        <div style="margin-top:6px"><span class="tag ${isB?'bo':'pb'}">${isB?'量价突破':'缩量回踩'}</span>
+          ${net5d!=null?`<span class="tag" style="background:#e8f7ef;color:#1f9d55">主力5日 ${sgn(net5d,2)}亿</span>`:''}</div>
+        ${r?`<div style="margin-top:8px">${bar('技术',r.tech_score,'#5b6ee1')}${bar('情绪',r.sent_score,'#1f9d55')}${bar('基本',r.fund_score,'#e8a020')}</div>`:`<div class="note" style="margin-top:6px;color:var(--mute)">未纳入打分分析池（仅前8候选参与）</div>`}
         <div class="sig-m">
           <span>成交额 <b>${nice(s.amount_yi)}亿</b></span>
           ${s.vol_ratio?`<span>放量 <b>${nice(s.vol_ratio,1)}x</b></span>`:''}
           ${s.vol_shrink?`<span>缩量 <b>${nice(s.vol_shrink,2)}x</b></span>`:''}
           ${s.ret_5d!=null?`<span>5日 <b class="up">+${nice(s.ret_5d,1)}%</b></span>`:''}
           ${s.ret_10d!=null?`<span>10日 <b class="up">+${nice(s.ret_10d,1)}%</b></span>`:''}
-        </div></div>`;
+        </div>
+        ${flagHtml}
+        ${reasons?`<ul style="margin:6px 0 0;padding-left:16px;color:#3a4156;font-size:12px;line-height:1.6">${reasons}</ul>`:''}
+      </div>`;
     });
     h+='</div>';
 
@@ -794,7 +816,7 @@ function renderSig(){
         <span>📑 全部候选信号（${cands.length} 只）</span><span class="arw" id="arw-cand">▼</span></div>
       <div class="coll-b" id="box-cand"><div class="tbl-wrap"><table>
         <thead><tr><th>#</th><th>代码</th><th>名称</th><th>收盘</th><th>涨跌</th>
-        <th>信号描述</th><th>成交额</th><th>强度</th></tr></thead><tbody>`;
+        <th>信号描述</th><th>成交额</th><th>强度</th><th>评分</th></tr></thead><tbody>`;
     cands.slice().sort((a,b)=>(b.sort_key||0)-(a.sort_key||0)).forEach((c,i)=>{
       const on=sel.has(c.code);
       h+=`<tr class="${on?'hl':''}">
@@ -805,7 +827,7 @@ function renderSig(){
         <td class="${cls(c.pct_chg)}">${sgn(c.pct_chg)}%</td>
         <td style="color:var(--mute);font-size:11.5px">${esc(c.signal_desc)}</td>
         <td>${nice(c.amount_yi)}亿</td>
-        <td class="up">+${nice(c.ret_5d!=null?c.ret_5d:c.ret_10d,1)}%</td></tr>`;
+        <td class="up">+${nice(c.ret_5d!=null?c.ret_5d:c.ret_10d,1)}%</td>${recoMap[c.code]?`<td class="${recoMap[c.code].total>=70?'up':(recoMap[c.code].total>=55?'':'down')}" style="font-weight:700">${recoMap[c.code].total.toFixed(1)}</td>`:'<td style="color:var(--mute)">—</td>'}</tr>`;
     });
     h+='</tbody></table></div></div></div>';
   }
@@ -1331,67 +1353,7 @@ function toggleColl(id){
   document.getElementById('arw-'+id).classList.toggle('open');
 }
 
-/* ═══ Tab(新增): 智能推荐 · 三维加权打分 ═══ */
-function renderReco(){
-  const d = DATA.reco;
-  const box = document.getElementById('p-reco');
-  if(!d || d.error || !d.records || !d.records.length){
-    box.innerHTML = `<div class="empty"><div class="empty-i">🧠</div>
-      <div class="empty-t">${esc((d&&d.message)||'暂无智能推荐（需选股后做消息面+基本面分析）')}</div>
-      <div class="empty-d">每日 16:35 选股后自动生成三维加权推荐</div></div>`;
-    return;
-  }
-  const w = d.weights||{tech:0.4,sent:0.35,fund:0.25};
-  const wi = (k)=>Math.round((w[k]||0)*100);
-  let h = '';
-  h += `<div class="card"><div class="card-t">🧠 智能推荐 · 三维加权打分</div>
-    <div class="mkt-kv" style="margin:6px 0 2px">
-      <span>数据截至 <b>${esc(d.as_of)}</b></span>
-      <span>权重 技术 <b>${wi('tech')}%</b> / 情绪 <b>${wi('sent')}%</b> / 基本面 <b>${wi('fund')}%</b></span>
-      <span>标的 <b>${d.count}</b> 只</span>
-    </div>
-    <div class="note" style="color:var(--mute)">技术=量价突破强度；情绪=主力资金流+题材+实时新闻(WebSearch)；基本面=估值/ROE/成长。防亏护栏：追高涨停 / 主力持续流出 / 业绩暴雷触发时总分封顶 60。</div>
-  </div>`;
-
-  d.records.forEach(r=>{
-    const m = r.metrics||{};
-    const lvl = r.total>=70?'强推':(r.total>=55?'关注':'谨慎');
-    const lvc = r.total>=70?'up':(r.total>=55?'':'down');
-    const flagHtml = (r.flags||[]).map(f=>`<div class="warnbox" style="margin:6px 0;padding:8px 10px">${esc(f)}</div>`).join('');
-    const bar = (label,val,c)=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px">
-        <span style="width:38px;color:var(--mute)">${label}</span>
-        <div style="flex:1;height:10px;background:#eef0f5;border-radius:6px;overflow:hidden">
-          <div style="width:${Math.max(0,Math.min(100,val))}%;height:100%;background:${c}"></div></div>
-        <span style="width:32px;text-align:right;font-weight:700">${val.toFixed(0)}</span></div>`;
-    const mt = [];
-    if(m.pe!=null) mt.push(`PE <b>${nice(m.pe,1)}</b>`);
-    if(m.pb!=null) mt.push(`PB <b>${nice(m.pb,2)}</b>`);
-    if(m.roe!=null) mt.push(`ROE <b>${nice(m.roe,1)}%</b>`);
-    if(m.rev_g!=null) mt.push(`营收<b class="${m.rev_g>=0?'up':'down'}">${sgn(m.rev_g,1)}%</b>`);
-    if(m.np_g!=null) mt.push(`净利<b class="${m.np_g>=0?'up':'down'}">${sgn(m.np_g,1)}%</b>`);
-    if(m.net_5d!=null) mt.push(`主力5日<b class="${m.net_5d>=0?'up':'down'}">${sgn(m.net_5d,2)}亿</b>`);
-    if(m.concept&&m.concept.length) mt.push(`题材 ${esc(m.concept.slice(0,3).join('/'))}`);
-    const reasons = (r.reasons||[]).map(x=>`<li>${esc(x)}</li>`).join('');
-    const news = m.news_headline? `<div class="note" style="margin-top:6px">📰 ${esc(m.news_headline)}</div>`:'';
-    h += `<div class="card" style="border-left:4px solid ${r.total>=70?'#e5384a':(r.total>=55?'#e8a020':'#8892a4')}">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><span style="font-size:18px;font-weight:800">#${r.rank} ${esc(r.name)}</span>
-          <span style="color:var(--mute);font-size:13px"> ${esc(r.code)} · ${esc(r.strategy||'')}</span></div>
-        <div style="text-align:right"><span style="font-size:26px;font-weight:800" class="${lvc}">${r.total.toFixed(1)}</span>
-          <span style="font-size:12px;color:var(--mute)"> /100</span><br>
-          <span class="pill ${r.total>=70?'red':(r.total>=55?'yellow':'gray')}">${lvl}</span></div>
-      </div>
-      ${bar('技术',r.tech_score,'#5b6ee1')}
-      ${bar('情绪',r.sent_score,'#1f9d55')}
-      ${bar('基本',r.fund_score,'#e8a020')}
-      <div class="mkt-kv" style="margin:8px 0 2px;flex-wrap:wrap">${mt.map(x=>`<span>${x}</span>`).join('')}</div>
-      ${flagHtml}
-      <ul style="margin:6px 0 0;padding-left:18px;color:#3a4156;font-size:13px;line-height:1.7">${reasons}</ul>
-      ${news}
-    </div>`;
-  });
-  box.innerHTML = h;
-}
+/* (智能推荐已并入"今日信号"Tab 的买入清单，按总分排序展示) */
 
 (function(){
   if(window.SNAPSHOT){ Object.assign(DATA, window.SNAPSHOT); renderHeader(); renderAll(); }
