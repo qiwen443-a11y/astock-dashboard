@@ -713,6 +713,8 @@ function renderSig(){
 
   const sigs=d.signals||[];
   const hold = st==='trend'?2:1;
+  const recoMap={};
+  (DATA.reco&&DATA.reco.records||[]).forEach(r=>{recoMap[r.code]=r;});
 
   if(st==='bear'){
     h+=`<div class="bear-box"><div class="empty-i">🛑</div>
@@ -738,8 +740,6 @@ function renderSig(){
       </div></div>`;
 
     /* 三维加权打分排名：直接并入今日信号，按总分排序 */
-    const recoMap={};
-    (DATA.reco&&DATA.reco.records||[]).forEach(r=>{recoMap[r.code]=r;});
     const ranked=sigs.map(s=>({s,r:recoMap[s.code]})).sort((a,b)=>(b.r?b.r.total:-1)-(a.r?a.r.total:-1));
     const _w=(DATA.reco&&DATA.reco.weights)||{tech:0.4,sent:0.35,fund:0.25};
     const _wi=k=>Math.round((_w[k]||0)*100);
