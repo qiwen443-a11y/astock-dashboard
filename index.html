@@ -39,14 +39,22 @@ body {
 .btn-solid:hover { background:#f2f0ff; transform:translateY(-1px); }
 .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
 
-/* ── Tabs ── */
-.tabs { display:flex; gap:4px; margin:16px 0 14px; background:#fff; padding:5px;
-  border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.05); overflow-x:auto; }
-.tab { flex:1; padding:10px 14px; border-radius:9px; font-size:14px; font-weight:600;
-  color:var(--sub); cursor:pointer; text-align:center; transition:all .16s; white-space:nowrap;
-  border:none; background:none; }
+/* ── Layout: 左侧纵向导航 + 右侧内容 ── */
+.layout { display:flex; gap:14px; align-items:flex-start; margin:16px 0 14px; }
+.tabs { display:flex; flex-direction:column; gap:4px; width:178px; flex-shrink:0; margin:0;
+  background:#fff; padding:6px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.05);
+  position:sticky; top:16px; height:fit-content; }
+.content { flex:1; min-width:0; }
+.tab { display:block; width:100%; text-align:left; padding:11px 14px; border-radius:9px;
+  font-size:14px; font-weight:600; color:var(--sub); cursor:pointer; transition:all .16s;
+  white-space:nowrap; border:none; background:none; }
 .tab:hover { background:#f4f6fa; color:var(--ink); }
 .tab.on { background:linear-gradient(120deg,#5b6ee1,#8a5cf6); color:#fff; box-shadow:0 3px 10px rgba(91,110,225,.3); }
+@media (max-width:780px){
+  .layout { flex-direction:column; }
+  .tabs { flex-direction:row; width:100%; overflow-x:auto; position:static; }
+  .tab { width:auto; flex:1; text-align:center; white-space:nowrap; }
+}
 .pane { display:none; }
 .pane.on { display:block; animation:fade .3s ease; }
 @keyframes fade { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
@@ -247,19 +255,21 @@ svg text { font-family:'Segoe UI','Microsoft YaHei',sans-serif; }
     <div class="ptxt" id="ptxt">启动中...</div>
   </div>
 
+  <div class="layout">
   <div class="tabs">
     <button class="tab on"  data-t="sig"   onclick="switchTab('sig')">📡 今日信号</button>
     <button class="tab"     data-t="buy"   onclick="switchTab('buy')">📡 竞价买入</button>
+    <button class="tab"     data-t="guard" onclick="switchTab('guard')">🛡 止损护栏</button>
     <button class="tab"     data-t="perf"  onclick="switchTab('perf')">📊 策略业绩</button>
     <button class="tab"     data-t="trade" onclick="switchTab('trade')">📒 交易明细</button>
     <button class="tab"     data-t="mkt"   onclick="switchTab('mkt')">🌐 市场概况</button>
     <button class="tab"     data-t="doc"   onclick="switchTab('doc')">📖 策略说明</button>
     <button class="tab"     data-t="etf"   onclick="switchTab('etf')">📊 ETF策略</button>
-    <button class="tab"     data-t="guard" onclick="switchTab('guard')">🛡 止损护栏</button>
   </div>
-
+  <div class="content">
   <div class="pane on" id="p-sig"><div class="loading"><div class="spin"></div><div style="margin-top:12px">加载信号数据...</div></div></div>
   <div class="pane" id="p-buy"></div>
+  <div class="pane" id="p-guard"></div>
   <div class="pane" id="p-perf"></div>
   <div class="pane" id="p-trade"></div>
   <div class="pane" id="p-mkt"></div>
@@ -380,7 +390,8 @@ alpha 几乎全部释放在 T+1 日内，尾盘进场等于接当天已经涨完
 7. <b>仅供研究参考，不构成投资建议。</b>据此操作，盈亏自负。
 </div></div>
 </div>
-  <div class="pane" id="p-guard"></div>
+  </div>
+  </div>
 
   <div class="foot">
     多策略组合 v4 &nbsp;|&nbsp; HS300&gt;MA20 趋势市·量价突破 / HS300&lt;MA20 且 MA20走平·缩量回踩 / MA20下行·熊市空仓<br>
