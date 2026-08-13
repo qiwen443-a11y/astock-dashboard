@@ -1320,6 +1320,15 @@ function renderBuyAdvice(){
       <div class="empty-d">每个交易日 09:30 由竞价买入建议模块生成</div></div>`;
     return;
   }
+  // ⏱ 未到竞价时间闸门：买入日 09:30 之前不展示该日买入清单（数据应视为空，避免提前显示未来信号）
+  const _now=new Date();
+  const _buyDt=new Date((d.buy_date||'')+'T09:30:30');
+  if(d.buy_date && !isNaN(_buyDt) && _now < _buyDt){
+    box.innerHTML=`<div class="empty"><div class="empty-i">⏳</div>
+      <div class="empty-t">🕐 等待 ${esc(d.buy_date)} 集合竞价</div>
+      <div class="empty-d">本买入决策将在 <b>${esc(d.buy_date)}</b> 09:25–09:30 集合竞价后由「竞价买入建议」模块生成；未到竞价时间不展示买入清单。</div></div>`;
+    return;
+  }
   const c=d.cnt||{}, bd={BUY:'#e23b3b',SKIP:'#1a9e4b',WATCH:'#e6a700'};
   const badge=t=>`<span style="background:${bd[t]||'#888'};color:#fff;padding:3px 12px;border-radius:10px;font-weight:700;font-size:13px">${({BUY:'买入',SKIP:'跳过',WATCH:'观望'})[t]||t}</span>`;
   const summary=`买入 <b style="color:#e23b3b">${c.BUY||0}</b> · 观望 <b style="color:#e6a700">${c.WATCH||0}</b> · 跳过 <b style="color:#1a9e4b">${c.SKIP||0}</b>`;
