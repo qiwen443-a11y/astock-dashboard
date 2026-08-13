@@ -392,6 +392,7 @@ window.SNAPSHOT = {"sig": {"scan_time": "2026-08-12 17:15:20", "signal_date": "2
 
 const C = { up:'#e5384a', down:'#12a35c', brand:'#5b6ee1', brand2:'#8a5cf6',
             warn:'#e8a020', gray:'#8892a4', line:'#e8ecf3', sub:'#5b6478', mute:'#98a1b3' };
+const STATE_COL = { trend:'#e5384a', range:'#12a35c', bear:'#6a7586', unknown:'#5b6ee1' };
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function nice(v, d){ d=d===undefined?2:d; return (v==null||isNaN(v))?'-':Number(v).toFixed(d); }
@@ -424,7 +425,7 @@ function lineChart(o){
   }
   // state band
   if(o.band){
-    const bw=iw/n, bc={trend:C.up, range:C.warn, bear:C.gray, unknown:C.brand};
+    const bw=iw/n, bc=STATE_COL;
     o.band.forEach((st,i)=>{
       g+=`<rect x="${(PL+i*bw).toFixed(1)}" y="${PT+ih+7}" width="${(bw+0.6).toFixed(1)}" height="7" fill="${bc[st]||C.mute}" opacity=".72"/>`;
     });
@@ -700,16 +701,16 @@ function renderSig(){
       ${lineChart({ labels:sl.map(x=>md(x.date)), band:sl.map(x=>x.state), h:250,
         series:[
           {name:'收盘', data:sl.map(x=>x.close), color:C.brand, fill:true, dot:false, width:2.2},
-          {name:'MA20', data:sl.map(x=>x.ma20), color:C.warn, dash:true, dot:false, width:1.6},
+          {name:'MA20', data:sl.map(x=>x.ma20), color:C.brand2, dash:true, dot:false, width:1.6},
           {name:'MA60', data:sl.map(x=>x.ma60), color:C.mute, dash:true, dot:false, width:1.2},
         ], yFmt:v=>v.toFixed(2) })}
       <div class="lg">
         <span><i style="background:${C.brand}"></i>收盘价</span>
-        <span><i style="background:${C.warn}"></i>MA20</span>
+        <span><i style="background:${C.brand2}"></i>MA20</span>
         <span><i style="background:${C.mute}"></i>MA60</span>
-        <span style="margin-left:14px"><i style="background:${C.up}"></i>趋势市</span>
-        <span><i style="background:${C.warn}"></i>震荡市</span>
-        <span><i style="background:${C.gray}"></i>熊市</span>
+        <span style="margin-left:14px"><i style="background:${STATE_COL.trend}"></i>趋势市</span>
+        <span><i style="background:${STATE_COL.range}"></i>震荡市</span>
+        <span><i style="background:${STATE_COL.bear}"></i>熊市</span>
       </div></div>`;
   }
 
