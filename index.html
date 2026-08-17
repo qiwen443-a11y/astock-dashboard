@@ -1055,7 +1055,7 @@ function renderTrades(){
 
   /* 实盘信号档案 */
   const hist=(DATA.hist&&DATA.hist.records)||[];
-  h+=`<div class="card"><div class="card-t">实盘信号档案 <span class="sub">扫描器每日产出记录 · 共 ${hist.length} 条</span></div>`;
+  h+=`<div class="card"><div class="card-t">实盘信号档案 <span class="sub">扫描器每日产出记录 · 共 ${hist.length} 条</span> <a href="http://127.0.0.1:8777/" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;background:var(--acc,#2e9e5b);color:#fff;padding:5px 12px;border-radius:7px;text-decoration:none;font-weight:600">📒 录入实盘</a></div>`;
   if(!hist.length){
     h+=`<div class="empty-d" style="text-align:center;padding:18px">尚无历史记录。每个交易日 16:30 自动扫描后会在此累积。</div>`;
   } else {
@@ -1101,8 +1101,9 @@ function renderTrades(){
 
   /* 实盘台账（用户手动录入的买卖，来自 real_trades.json） */
   const rtList=(DATA.real_trades&&DATA.real_trades.records)||[];
+  h+='<div class="card" style="margin-top:14px"><div class="card-t" style="display:flex;align-items:center;gap:8px">📒 我的实盘台账 <span class="sub">手动录入的买卖记录 · 共 '+rtList.length+' 笔</span>'
+    +'<a href="http://127.0.0.1:8777/" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;background:var(--acc,#2e9e5b);color:#fff;padding:5px 12px;border-radius:7px;text-decoration:none;font-weight:600">＋ 录入一笔</a></div>';
   if(rtList.length){
-    h+='<div class="card" style="margin-top:14px"><div class="card-t">📒 我的实盘台账 <span class="sub">手动录入的买卖记录 · 共 '+rtList.length+' 笔</span></div>';
     h+='<div class="tbl-wrap"><table><thead><tr><th>信号日</th><th>代码</th><th>名称</th><th>买入时间</th><th>买入价</th><th>股数</th><th>买入金额</th><th>卖出时间</th><th>卖出价</th><th>实盘收益</th><th>备注</th></tr></thead><tbody>';
     rtList.slice().reverse().forEach(t=>{
       const bp=parseFloat(t.buy_price||0), sh=parseInt(t.shares||0)||0;
@@ -1116,8 +1117,10 @@ function renderTrades(){
         +'<td style="color:var(--mute)">'+esc(t.note||'')+'</td></tr>';
     });
     h+='</tbody></table></div>';
-    h+='<div class="note" style="margin-top:8px;color:var(--mute)">实盘收益 =（卖出价−买入价）×股数；未填卖出价视为持仓中。录入方式：本地运行 <code>real_trade_server.py</code> 后打开录入页提交。</div></div>';
+  } else {
+    h+='<div class="empty-d" style="text-align:center;padding:18px">还没有录入实盘。点右上角「＋ 录入一笔」，或直接打开 <a href="http://127.0.0.1:8777/" target="_blank" rel="noopener" style="color:#5ab0ff">录入页 http://127.0.0.1:8777/</a>（需先在 <code>.backtest_data</code> 目录运行 <code>python real_trade_server.py</code> 启动本地服务）。</div>';
   }
+  h+='<div class="note" style="margin-top:8px;color:var(--mute)">实盘收益 =（卖出价−买入价）×股数；未填卖出价视为持仓中。</div></div>';
 
   /* 回测交易明细 */
   h+=`<div class="sec-t">📒 回测交易明细 <span class="sub" style="font-weight:500;font-size:12px;color:var(--mute)">
