@@ -1029,9 +1029,13 @@ function subBox(name, desc, ts, color){
 }
 
 /* ═══ Tab3: 交易明细 ═══ */
-function realBlock(p){
-  if(!p || !p.real) return '';
-  const rt=p.real;
+function realBlock(p, sigDate){
+  let rt=p.real;
+  if(!rt){
+    const lt=getLocalTrades().find(t=> t.code===p.code && (t.signal_date||'')===(sigDate||''));
+    if(lt) rt=normReal(lt);
+  }
+  if(!rt) return '';
   const bp=parseFloat(rt.buy_price||0), sh=parseInt(rt.shares||0)||0;
   const amt=(rt.buy_amount!=null? rt.buy_amount : bp*sh);
   let s='<div style="margin-top:4px;padding:4px 8px;border-left:3px solid #2e9e5b;background:rgba(46,158,91,.08);border-radius:4px;font-size:12px;color:#bfe9cf">'
@@ -1047,6 +1051,59 @@ function realBlock(p){
   s+='</div>';
   return s;
 }
+/* 实盘录入：浏览器本地存储（localStorage），不依赖本地服务 */
+const RT_KEY='astock_real_trades';
+function getLocalTrades(){ try{ return JSON.parse(localStorage.getItem(RT_KEY)||'[]'); }catch(e){ return []; } }
+function setLocalTrades(a){ try{ localStorage.setItem(RT_KEY, JSON.stringify(a)); }catch(e){ alert('本地存储不可用：'+e.message); } }
+function normReal(t){
+  const bp=parseFloat(t.buy_price||0), sh=parseInt(t.shares||0)||0;
+  const o={buy_time:t.buy_time, buy_price:bp, shares:sh, buy_amount:bp*sh, note:t.note};
+  const sp=t.sell_price;
+  if(sp!=null && sp!=='' && parseFloat(sp)>0){ const f=parseFloat(sp); o.sell_price=f; o.sell_time=t.sell_time; o.real_return=(f-bp)/bp*100; o.real_pnl=(f-bp)*sh; }
+  return o;
+}
+function allRealTrades(){
+  const base=(DATA.real_trades&&DATA.real_trades.records)||[];
+  return base.concat(getLocalTrades().map(t=>({_local:true, code:t.code, name:t.name, signal_date:t.signal_date, buy_time:t.buy_time, buy_price:t.buy_price, shares:t.shares, sell_time:t.sell_time, sell_price:t.sell_price, note:t.note, id:t.id})));
+}
+function toggleEntryForm(){
+  const el=document.getElementById('rt-entry-form');
+  if(el) el.style.display = (el.style.display==='none'||el.style.display==='')? 'block':'none';
+}
+function submitLocalTrade(e){
+  e.preventDefault();
+  const f=e.target;
+  const code=(f.code.value||'').trim();
+  const name=(f.name.value||'').trim();
+  const sd=(f.signal_date.value||'').trim();
+  const bt=(f.buy_time.value||'').trim().replace('T',' ');
+  const bp=parseFloat(f.buy_price.value);
+  const sh=parseInt(f.shares.value);
+  const st=(f.sell_time.value||'').trim().replace('T',' ');
+  const spv=(f.sell_price.value||'').trim();
+  const sp= spv? parseFloat(spv): null;
+  const note=(f.note.value||'').trim();
+  if(!/^\d{6}$/.test(code)){ alert('代码必须是6位数字'); return false; }
+  if(!(bp>0)){ alert('买入价必须是正数'); return false; }
+  if(!(sh>0)){ alert('股数必须是正整数'); return false; }
+  const rec={ id:'rtl_'+Date.now(), signal_date:sd, code:code, name:name, buy_time:bt, buy_price:bp, shares:sh, sell_time:st, sell_price:sp, note:note, created_at:new Date().toLocaleString('zh-CN') };
+  const a=getLocalTrades(); a.push(rec); setLocalTrades(a);
+  alert('已保存到本地浏览器。'+ (sp!=null? ' 实盘收益 '+((sp-bp)/bp*100).toFixed(2)+'%。':'（持仓中）'));
+  renderTrades();
+  return false;
+}
+function delLocalTrade(id){
+  if(!confirm('删除这条本地记录？')) return;
+  setLocalTrades(getLocalTrades().filter(t=>t.id!==id));
+  renderTrades();
+}
+function exportLocalTrades(){
+  const a=allRealTrades();
+  const blob=new Blob([JSON.stringify({records:a},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a0=document.createElement('a'); a0.href=url; a0.download='real_trades_export.json'; a0.click();
+  URL.revokeObjectURL(url);
+}
 function renderTrades(){
   const b=DATA.bt&&DATA.bt.best, box=document.getElementById('p-trade');
   if(!b){ box.innerHTML='<div class="empty"><div class="empty-t">回测数据未加载</div></div>'; return; }
@@ -1055,7 +1112,7 @@ function renderTrades(){
 
   /* 实盘信号档案 */
   const hist=(DATA.hist&&DATA.hist.records)||[];
-  h+=`<div class="card"><div class="card-t">实盘信号档案 <span class="sub">扫描器每日产出记录 · 共 ${hist.length} 条</span> <a href="http://127.0.0.1:8777/" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;background:var(--acc,#2e9e5b);color:#fff;padding:5px 12px;border-radius:7px;text-decoration:none;font-weight:600">📒 录入实盘</a></div>`;
+  h+=`<div class="card"><div class="card-t">实盘信号档案 <span class="sub">扫描器每日产出记录 · 共 ${hist.length} 条</span> <button onclick="toggleEntryForm();setTimeout(function(){var el=document.getElementById('rt-entry-form');if(el)el.scrollIntoView({behavior:'smooth'});},50)" style="margin-left:auto;font-size:12px;background:var(--acc,#2e9e5b);color:#fff;padding:5px 12px;border:none;border-radius:7px;font-weight:600;cursor:pointer">📒 录入实盘</button></div>`;
   if(!hist.length){
     h+=`<div class="empty-d" style="text-align:center;padding:18px">尚无历史记录。每个交易日 16:30 自动扫描后会在此累积。</div>`;
   } else {
@@ -1077,7 +1134,7 @@ function renderTrades(){
           const lc=p.latest_close!=null? p.latest_close : '—';
           base= nm+' <span class="mono">'+p.buy_price+'≈'+lc+'</span> <b class="'+cls(p.m2m_return)+'">'+(p.m2m_return>0?'+':'')+p.m2m_return+'%浮</b>';
         } else base= nm+' <span class="mono">'+p.buy_price+'</span>';
-        return base + realBlock(p);
+        return base + realBlock(p, r.date);
       }).join('<br>');
       // 记录级聚合：优先实际收益，缺失用浮盈亏补
       const eff=(r.picks||[]).map(p=> p.actual_return!=null? {v:p.actual_return,k:'a'} : (p.m2m_return!=null? {v:p.m2m_return,k:'m'} : null)).filter(Boolean);
@@ -1099,13 +1156,33 @@ function renderTrades(){
   h+=`<div class="note" style="margin-top:10px;color:var(--mute)">
     实际收益 = 买入日开盘价 → 卖出日开盘价，含 -5% 盘中止损；持仓标的显示「浮」盈亏（按最新收盘 ${esc(asOf)} 估算）。行情来自 tdx-connector 快照缓存。</div></div>`;
 
-  /* 实盘台账（用户手动录入的买卖，来自 real_trades.json） */
-  const rtList=(DATA.real_trades&&DATA.real_trades.records)||[];
-  h+='<div class="card" style="margin-top:14px"><div class="card-t" style="display:flex;align-items:center;gap:8px">📒 我的实盘台账 <span class="sub">手动录入的买卖记录 · 共 '+rtList.length+' 笔</span>'
-    +'<a href="http://127.0.0.1:8777/" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;background:var(--acc,#2e9e5b);color:#fff;padding:5px 12px;border-radius:7px;text-decoration:none;font-weight:600">＋ 录入一笔</a></div>';
-  if(rtList.length){
-    h+='<div class="tbl-wrap"><table><thead><tr><th>信号日</th><th>代码</th><th>名称</th><th>买入时间</th><th>买入价</th><th>股数</th><th>买入金额</th><th>卖出时间</th><th>卖出价</th><th>实盘收益</th><th>备注</th></tr></thead><tbody>';
-    rtList.slice().reverse().forEach(t=>{
+  /* 实盘台账（手动录入：real_trades.json 已烘焙 + 浏览器本地新增） */
+  const rtAll=allRealTrades();
+  h+='<div class="card" style="margin-top:14px"><div class="card-t" style="display:flex;align-items:center;gap:8px">📒 我的实盘台账 <span class="sub">手动录入的买卖记录 · 共 '+rtAll.length+' 笔（本地浏览器 + 已部署）</span>'
+    +'<button onclick="exportLocalTrades()" style="font-size:12px;background:#2a3340;color:#fff;padding:5px 12px;border:none;border-radius:7px;cursor:pointer">导出 JSON</button>'
+    +'<button onclick="toggleEntryForm()" style="margin-left:auto;font-size:12px;background:var(--acc,#2e9e5b);color:#fff;padding:5px 12px;border:none;border-radius:7px;cursor:pointer;font-weight:600">＋ 录入一笔</button></div>';
+
+  /* 内嵌录入表单（默认隐藏） */
+  h+='<form id="rt-entry-form" onsubmit="return submitLocalTrade(event)" style="display:none;margin:12px 0;padding:14px;border:1px solid var(--line,#2a3340);border-radius:8px;background:rgba(255,255,255,.02)">'
+    +'<div style="font-size:13px;color:var(--mut,#8b97a5);margin-bottom:8px">录入你的真实成交（保存在本浏览器；换设备/清缓存会丢，记得用「导出 JSON」备份）。信号日填了会自动挂到对应那行。</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">代码(6位)*</label><input name="code" required pattern="\\d{6}" placeholder="002437" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">名称</label><input name="name" placeholder="誉衡药业" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">信号日</label><input name="signal_date" placeholder="2026-08-17" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">买入时间*</label><input type="datetime-local" name="buy_time" required style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">买入价*</label><input type="number" step="0.01" name="buy_price" required placeholder="4.57" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">股数*</label><input type="number" name="shares" required placeholder="1000" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">卖出时间</label><input type="datetime-local" name="sell_time" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">卖出价</label><input type="number" step="0.01" name="sell_price" placeholder="4.80" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'<div><label style="font-size:12px;color:var(--mut,#8b97a5)">备注</label><input name="note" placeholder="如：分时加仓" style="width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#2a3340);background:#0e1318;color:var(--fg,#e6edf3)"></div>'
+    +'</div>'
+    +'<div style="margin-top:12px;display:flex;gap:10px"><button type="submit" style="background:var(--acc,#2e9e5b);color:#fff;border:none;padding:9px 18px;border-radius:7px;cursor:pointer;font-size:14px">保存并刷新</button>'
+    +'<button type="button" onclick="toggleEntryForm()" style="background:#2a3340;color:#fff;border:none;padding:9px 18px;border-radius:7px;cursor:pointer">收起</button></div>'
+    +'</form>';
+
+  if(rtAll.length){
+    h+='<div class="tbl-wrap"><table><thead><tr><th>信号日</th><th>代码</th><th>名称</th><th>买入时间</th><th>买入价</th><th>股数</th><th>买入金额</th><th>卖出时间</th><th>卖出价</th><th>实盘收益</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+    rtAll.slice().reverse().forEach(t=>{
       const bp=parseFloat(t.buy_price||0), sh=parseInt(t.shares||0)||0;
       const ba=bp*sh; const sp=t.sell_price;
       let rr='—', rp='—';
@@ -1114,13 +1191,14 @@ function renderTrades(){
         +'<td>'+esc(t.buy_time||'-')+'</td><td>'+bp.toFixed(2)+'</td><td>'+sh+'</td><td>¥'+ba.toFixed(2)+'</td>'
         +'<td>'+(sp?esc(t.sell_time||'-'):'—')+'</td><td>'+(sp?parseFloat(sp).toFixed(2):'—')+'</td>'
         +'<td class="'+(rr!=='—'?cls(parseFloat(rr)):'')+'">'+(rr!=='—'?'<b>'+(parseFloat(rr)>0?'+':'')+rr+'</b> '+rp:'—')+'</td>'
-        +'<td style="color:var(--mute)">'+esc(t.note||'')+'</td></tr>';
+        +'<td style="color:var(--mute)">'+esc(t.note||'')+'</td>'
+        +'<td>'+(t._local?'<button onclick="delLocalTrade(\''+t.id+'\')" style="background:#a33;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">删除</button>':'—')+'</td></tr>';
     });
     h+='</tbody></table></div>';
   } else {
-    h+='<div class="empty-d" style="text-align:center;padding:18px">还没有录入实盘。点右上角「＋ 录入一笔」，或直接打开 <a href="http://127.0.0.1:8777/" target="_blank" rel="noopener" style="color:#5ab0ff">录入页 http://127.0.0.1:8777/</a>（需先在 <code>.backtest_data</code> 目录运行 <code>python real_trade_server.py</code> 启动本地服务）。</div>';
+    h+='<div class="empty-d" style="text-align:center;padding:18px">还没有录入实盘。点右上角「＋ 录入一笔」展开表单即可（数据存在本浏览器）。</div>';
   }
-  h+='<div class="note" style="margin-top:8px;color:var(--mute)">实盘收益 =（卖出价−买入价）×股数；未填卖出价视为持仓中。</div></div>';
+  h+='<div class="note" style="margin-top:8px;color:var(--mute)">实盘收益 =（卖出价−买入价）×股数；未填卖出价视为持仓中。本地录入仅存于当前浏览器；点「导出 JSON」下载全部记录，交给我即可烘焙进 real_trades.json 并部署到 GitHub Pages。</div></div>';
 
   /* 回测交易明细 */
   h+=`<div class="sec-t">📒 回测交易明细 <span class="sub" style="font-weight:500;font-size:12px;color:var(--mute)">
