@@ -1368,7 +1368,7 @@ function exportLocalTrades(){
 function renderTrades(){
   const b=DATA.bt&&DATA.bt.best, box=document.getElementById('p-trade');
   if(!b){ box.innerHTML='<div class="empty"><div class="empty-t">回测数据未加载</div></div>'; return; }
-  const months=[...new Set(b.trades.map(t=>t.signal_date.slice(0,7)))].sort();
+  const months=[...new Set(b.trades.map(t=>t.buy_date.slice(0,7)))].sort();
   let h='';
 
   /* 实盘信号档案 */
@@ -1501,6 +1501,7 @@ function renderTrades(){
       ${fchip('month','all','全部')}${months.map(m=>fchip('month',m,m.slice(5)+'月')).join('')}
     </div>
     <div id="trade-stat" class="note" style="margin-bottom:10px"></div>
+    <div class="note" style="margin-bottom:10px;color:var(--mute)">月份按 <b>买入日</b> 划分（与「策略业绩」月度收益口径一致）。<b>月收益(复利)</b> = 同日收益先平均、再跨日复利，等于策略业绩对应月份数字；<b>累加收益(简单相加)</b> 仅为该月各笔收益之和、会高估（未扣除重叠持仓），仅供参考。</div>
     <div class="tbl-wrap" style="max-height:620px;overflow-y:auto"><table id="trade-tbl">
       <thead><tr>
         ${th('signal_date','信号日')}${th('code','代码')}<th>名称</th>
@@ -1523,12 +1524,22 @@ function th(k,t){ return `<th class="sortable" onclick="sortTrades('${k}')">${t}
 function fchip(g,v,t){ return `<button class="fchip ${tFilter[g]===v?'on':''}" onclick="setFilter('${g}','${v}')">${t}</button>`; }
 function setFilter(g,v){ tFilter[g]=v; renderTrades(); }
 function sortTrades(k){ if(tSort.key===k) tSort.dir*=-1; else {tSort.key=k; tSort.dir=-1;} drawTrades(); }
+// 与「策略业绩」月度收益完全一致：按买入日分组，同日多笔收益先平均，再跨日复利相乘
+function compoundReturn(trades){
+  if(!trades.length) return 0;
+  const byDay={};
+  trades.forEach(t=>{ const d=t.buy_date, v=(t.return||0);
+    if(!byDay[d]) byDay[d]={s:0,n:0}; byDay[d].s+=v; byDay[d].n++; });
+  const days=Object.keys(byDay).sort();
+  let r=1; days.forEach(d=>{ r*=(1+(byDay[d].s/byDay[d].n)/100); });
+  return (r-1)*100;
+}
 
 function drawTrades(){
   const b=DATA.bt.best;
   let ts=b.trades.filter(t=>{
     if(tFilter.strat!=='all' && t.strategy!==tFilter.strat) return false;
-    if(tFilter.month!=='all' && t.signal_date.slice(0,7)!==tFilter.month) return false;
+    if(tFilter.month!=='all' && t.buy_date.slice(0,7)!==tFilter.month) return false;
     if(tFilter.res==='win' && t.return<=0) return false;
     if(tFilter.res==='lose' && t.return>0) return false;
     if(tFilter.res==='stop' && !t.stopped) return false;
@@ -1539,10 +1550,12 @@ function drawTrades(){
     return tSort.dir*((x||0)-(y||0)); });
   const r=ts.map(t=>t.return), w=r.filter(v=>v>0).length;
   const sum=r.reduce((a,c)=>a+c,0);
+  const cmp=compoundReturn(ts);
   document.getElementById('trade-stat').innerHTML = ts.length?
     `筛选出 <b>${ts.length}</b> 笔 · 胜率 <b>${(w/ts.length*100).toFixed(1)}%</b> ·
      平均单笔 <b class="${cls(sum/ts.length)}">${sgn(sum/ts.length)}%</b> ·
-     累加收益 <b class="${cls(sum)}">${sgn(sum,1)}%</b> ·
+     累加收益(简单相加) <b class="${cls(sum)}">${sgn(sum,1)}%</b> ·
+     月收益(复利) <b class="${cls(cmp)}">${sgn(cmp,2)}%</b> ·
      止损 <b>${ts.filter(t=>t.stopped).length}</b> 笔` : '无符合条件的交易';
   let h='';
   ts.forEach(t=>{
