@@ -1104,9 +1104,74 @@ function toggleEntryForm(){
     const pad=n=>String(n).padStart(2,'0');
     const today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
     const nowT=pad(now.getHours())+':'+pad(now.getMinutes());
-    if(!document.getElementById('rt-buy-date').value) document.getElementById('rt-buy-date').value=today;
-    if(!document.getElementById('rt-buy-time').value) document.getElementById('rt-buy-time').value=nowT;
+    const bd=document.getElementById('rt-buy-date');
+    if(bd && !bd.value){ bd.value=today; const b=document.getElementById('rt-buy-date-btn'); b.textContent=today; b.classList.add('rt-filled'); }
+    const bt=document.getElementById('rt-buy-time');
+    if(bt && !bt.value){ bt.value=nowT; const b=document.getElementById('rt-buy-time-btn'); b.textContent=nowT; b.classList.add('rt-filled'); }
   }
+}
+/* 纯 JS 下拉选择器（不依赖原生 date/time，适配预览 webview） */
+function ensureRtStyle(){
+  if(document.getElementById('rt-pick-style')) return;
+  const s=document.createElement('style'); s.id='rt-pick-style';
+  s.textContent='.rt-pick{width:100%;padding:7px;border-radius:6px;border:1px solid var(--line,#e8ecf3);background:#fff;color:var(--mute,#98a1b3);text-align:left;cursor:pointer;font-size:13px;font-family:inherit}'
+    +'.rt-pick.rt-filled{color:var(--ink,#12172b)}'
+    +'.rt-pop{position:fixed;z-index:9999;background:#fff;border:1px solid #d8deea;border-radius:10px;padding:10px;box-shadow:0 8px 30px rgba(20,30,60,.18);color:#12172b;font-family:inherit}'
+    +'.rt-cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13px;font-weight:600}'
+    +'.rt-nav{cursor:pointer;padding:2px 10px;font-size:16px;color:#5b6ee1;border-radius:6px}.rt-nav:hover{background:#eef0fb}'
+    +'.rt-week,.rt-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}'
+    +'.rt-week span{text-align:center;font-size:11px;color:#98a1b3;padding:3px 0}'
+    +'.rt-cell{text-align:center;padding:6px 0;border-radius:6px;cursor:pointer;font-size:12px}'
+    +'.rt-cell:hover{background:#eef0fb}.rt-cell.rt-sel{background:#5b6ee1;color:#fff}.rt-cell.rt-empty{visibility:hidden}'
+    +'.rt-time{display:flex;gap:8px}.rt-col{max-height:210px;overflow:auto;width:66px}'
+    +'.rt-tcell{text-align:center;padding:7px 0;border-radius:6px;cursor:pointer;font-size:13px}.rt-tcell:hover{background:#eef0fb}.rt-tcell.rt-sel{background:#5b6ee1;color:#fff}';
+  document.head.appendChild(s);
+}
+function pad2(n){ return String(n).padStart(2,'0'); }
+function todayISO(){ const n=new Date(); return n.getFullYear()+'-'+pad2(n.getMonth()+1)+'-'+pad2(n.getDate()); }
+let _rtPop=null;
+function _rtClose(){ if(_rtPop){ _rtPop.remove(); _rtPop=null; document.removeEventListener('mousedown',_rtOutside,true); } }
+function _rtOutside(e){ if(_rtPop && !_rtPop.contains(e.target) && !e.target.classList.contains('rt-pick')) _rtClose(); }
+function _rtPos(btn){ const r=btn.getBoundingClientRect(); const p=document.createElement('div'); p.className='rt-pop'; p.style.left=Math.max(8,Math.min(r.left,window.innerWidth-230))+'px'; p.style.top=(r.bottom+4)+'px'; document.body.appendChild(p); _rtPop=p; setTimeout(function(){document.addEventListener('mousedown',_rtOutside,true);},0); return p; }
+function openDatePicker(btn){
+  ensureRtStyle(); _rtClose();
+  const hid=btn.nextElementSibling;
+  const cur=hid.value|| todayISO();
+  const ps=cur.split('-'); window._rt={ yy:+ps[0], M:+(ps[1]||(new Date().getMonth()+1)), hid:hid, btn:btn };
+  const p=_rtPos(btn);
+  p.innerHTML='<div class="rt-cal-h"><span class="rt-nav" onclick="rtShiftM(-1,event)">‹</span><span id="rt-ttl"></span><span class="rt-nav" onclick="rtShiftM(1,event)">›</span></div>'
+    +'<div class="rt-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>'
+    +'<div class="rt-grid" id="rt-grid"></div>';
+  rtDrawCal();
+}
+function rtDrawCal(){
+  const w=window._rt, p=_rtPop;
+  p.querySelector('#rt-ttl').textContent=w.yy+'年'+w.M+'月';
+  const grid=p.querySelector('#rt-grid'); grid.innerHTML='';
+  const first=new Date(w.yy,w.M-1,1).getDay();
+  const days=new Date(w.yy,w.M,0).getDate();
+  for(let i=0;i<first;i++){ const e=document.createElement('span'); e.className='rt-cell rt-empty'; grid.appendChild(e); }
+  for(let d=1;d<=days;d++){
+    const e=document.createElement('span'); e.className='rt-cell'; e.textContent=d;
+    const val=w.yy+'-'+pad2(w.M)+'-'+pad2(d);
+    if(val===w.hid.value) e.classList.add('rt-sel');
+    e.onclick=function(){ w.hid.value=val; w.btn.textContent=val; w.btn.classList.add('rt-filled'); _rtClose(); };
+    grid.appendChild(e);
+  }
+}
+function rtShiftM(dir,ev){ ev.stopPropagation(); const w=window._rt; w.M+=dir; if(w.M<1){w.M=12;w.yy--;} if(w.M>12){w.M=1;w.yy++;} rtDrawCal(); }
+function openTimePicker(btn){
+  ensureRtStyle(); _rtClose();
+  const hid=btn.nextElementSibling;
+  const hh=hid.value? hid.value.split(':')[0] : '09';
+  const mm=hid.value? hid.value.split(':')[1] : '30';
+  const p=_rtPos(btn);
+  p.innerHTML='<div class="rt-time"><div class="rt-col" id="rt-hh"></div><div class="rt-col" id="rt-mm"></div></div>';
+  const hhc=p.querySelector('#rt-hh'), mmc=p.querySelector('#rt-mm');
+  for(let i=0;i<24;i++){ const e=document.createElement('div'); e.className='rt-tcell'+(pad2(i)===hh?' rt-sel':''); e.textContent=pad2(i); hhc.appendChild(e); }
+  for(let i=0;i<60;i+=5){ const e=document.createElement('div'); e.className='rt-tcell'+(pad2(i)===mm?' rt-sel':''); e.textContent=pad2(i); mmc.appendChild(e); }
+  hhc.querySelectorAll('.rt-tcell').forEach(function(c){ c.onclick=function(){ hhc.querySelectorAll('.rt-tcell').forEach(function(x){x.classList.remove('rt-sel');}); c.classList.add('rt-sel'); }; });
+  mmc.querySelectorAll('.rt-tcell').forEach(function(c){ c.onclick=function(){ mmc.querySelectorAll('.rt-tcell').forEach(function(x){x.classList.remove('rt-sel');}); c.classList.add('rt-sel'); const h=hhc.querySelector('.rt-sel').textContent; const m=c.textContent; hid.value=h+':'+m; btn.textContent=h+':'+m; btn.classList.add('rt-filled'); _rtClose(); }; });
 }
 function submitLocalTrade(e){
   e.preventDefault();
@@ -1209,13 +1274,13 @@ function renderTrades(){
     +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">'
     +'<div><label '+FL+'>代码(6位)*</label><input id="rt-code" name="code" required pattern="\\d{6}" placeholder="002437" list="rt-code-list" oninput="autofillRealName(this)" '+FI+'></div>'
     +'<div><label '+FL+'>名称（自动带出）</label><input id="rt-name" name="name" placeholder="自动带出/可改" '+FI+'></div>'
-    +'<div><label '+FL+'>信号日</label><input name="signal_date" type="date" list="rt-sigdate-list" '+FI+'></div>'
-    +'<div><label '+FL+'>买入日期*</label><input type="date" id="rt-buy-date" name="buy_date" required '+FI+'></div>'
-    +'<div><label '+FL+'>买入时间*</label><input type="time" id="rt-buy-time" name="buy_time_only" required '+FI+'></div>'
+    +'<div><label '+FL+'>信号日</label><button type="button" class="rt-pick" id="rt-sig-btn" onclick="openDatePicker(this)">选信号日(可空)</button><input type="hidden" name="signal_date" id="rt-sig"></div>'
+    +'<div><label '+FL+'>买入日期*</label><button type="button" class="rt-pick" id="rt-buy-date-btn" onclick="openDatePicker(this)">选择日期</button><input type="hidden" name="buy_date" id="rt-buy-date"></div>'
+    +'<div><label '+FL+'>买入时间*</label><button type="button" class="rt-pick" id="rt-buy-time-btn" onclick="openTimePicker(this)">选择时间</button><input type="hidden" name="buy_time_only" id="rt-buy-time"></div>'
     +'<div><label '+FL+'>买入价*</label><input type="number" step="0.01" name="buy_price" required placeholder="4.57" oninput="updateAmtPreview()" '+FI+'></div>'
     +'<div><label '+FL+'>股数*</label><input type="number" name="shares" required placeholder="1000" oninput="updateAmtPreview()" '+FI+'></div>'
-    +'<div><label '+FL+'>卖出日期</label><input type="date" name="sell_date" '+FI+'></div>'
-    +'<div><label '+FL+'>卖出时间</label><input type="time" name="sell_time_only" '+FI+'></div>'
+    +'<div><label '+FL+'>卖出日期</label><button type="button" class="rt-pick" id="rt-sell-date-btn" onclick="openDatePicker(this)">选择日期</button><input type="hidden" name="sell_date" id="rt-sell-date"></div>'
+    +'<div><label '+FL+'>卖出时间</label><button type="button" class="rt-pick" id="rt-sell-time-btn" onclick="openTimePicker(this)">选择时间</button><input type="hidden" name="sell_time_only" id="rt-sell-time"></div>'
     +'<div><label '+FL+'>卖出价</label><input type="number" step="0.01" name="sell_price" placeholder="4.80" '+FI+'></div>'
     +'<div><label '+FL+'>备注</label><input name="note" placeholder="如：分时加仓" '+FI+'></div>'
     +'</div>'
