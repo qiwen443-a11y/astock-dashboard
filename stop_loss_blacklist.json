@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-08-19",
+  "updated_at": "2026-08-20",
   "rules": {
     "stop_loss_pct": 5.0,
     "cooling_window_days": 60,
@@ -12,7 +12,7 @@
       "code": "002491",
       "name": "通鼎互联",
       "reason": "跨策略家族(combo+pullback)全止损3次/0盈利，系统性失效",
-      "added_at": "2026-08-19",
+      "added_at": "2026-08-20",
       "last_stop": "2026-05-02",
       "source": "backtest_2026H1"
     },
@@ -20,7 +20,7 @@
       "code": "600881",
       "name": "亚泰集团",
       "reason": "跨策略家族(firstboard+pullback)全止损3次/0盈利，系统性失效",
-      "added_at": "2026-08-19",
+      "added_at": "2026-08-20",
       "last_stop": "2026-07-20",
       "source": "backtest_2026H1"
     },
@@ -28,7 +28,7 @@
       "code": "605580",
       "name": "恒盛能源",
       "reason": "跨策略家族(combo+firstboard)全止损3次/0盈利，系统性失效",
-      "added_at": "2026-08-19",
+      "added_at": "2026-08-20",
       "last_stop": "2026-06-03",
       "source": "backtest_2026H1"
     }
