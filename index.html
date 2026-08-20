@@ -1032,13 +1032,13 @@ function renderPerf(){
     });
     h+=`</tbody></table></div>
       <div class="warnbox" style="margin-top:12px">📌 <b>回测结论（重要 · 与预期相反）</b><br>
-        当前线上「文奇优化策略」= HS300 MA20 斜率&lt;0 <b>全天空仓</b> + 个股 ret5≥30% 超买不买。
+        此前线上「文奇优化策略」（<b>已于 2026-08-20 回滚</b>）= HS300 MA20 斜率&lt;0 <b>全天空仓</b> + 个股 ret5≥30% 超买不买。
         在 3-8 月（含补抓的 8 月中下旬）样本内：累计 <b>${sgn(b.total_return)}%</b>、胜率 ${b.win_rate}%，
         在四种配置中<b>表现最差</b>——甚至跑输「完全不过滤」基准（${sgn((modes['none']||{}).total_return||0)}%）与旧 combo_v4 熊市腿模式（${sgn((modes['slope_partial']||{}).total_return||0)}%）。
         <br><br>📉 <b>两个新过滤为何反效果</b>：
         ① <b>full slope&lt;0 全天空仓</b>：把牛市腿的突破也跳了（旧 combo_v4 只跳<b>熊市腿的回踩</b>）。突破在趋势市盈利丰厚，全跳→少赚（slope_full 累计 ${sgn((modes['slope_full']||{}).total_return||0)}%）。
         ② <b>ret5≥30% 护栏</b>：突破策略本就按 ret5（5日动量）<b>排序选前几名</b>，护栏把动量最高的龙头整批剔掉、改选更弱的票→反而接盘弱势股（共拦 ${DATA.bt.ret5_excluded!=null?DATA.bt.ret5_excluded:'?'} 个突破信号，累计从 ${sgn((modes['slope_full']||{}).total_return||0)}% 跌到 ${sgn(b.total_return)}%）。
-        <br><br>✅ <b>建议</b>：回滚 daily_scanner 的熊市闸门到 combo_v4 的「<b>仅熊市腿</b>」口径（slope_partial，累计 ${sgn((modes['slope_partial']||{}).total_return||0)}% 为四配置次优），并<b>暂不采用</b> ret5 硬护栏（保留为竞价模块「软警示」供人工参考即可，不要自动不买）。
+        <br><br>✅ <b>已执行回滚（2026-08-20）</b>：daily_scanner 熊市闸门已回到 combo_v4「<b>仅熊市腿</b>」口径（slope_partial，累计 ${sgn((modes['slope_partial']||{}).total_return||0)}% 为四配置次优）；preopen 的 ret5 本就为<b>软警示</b>（BUY 降级 WATCH、不自动不买），与回滚建议一致，未做硬拦截。下一步用未来下跌市数据再验证该口径是否仍占优。
         <br><br>⚠️ <b>诚实边界</b>：以上为同一历史样本 in-sample 回测。3-8 月尤其 8 月偏强，过滤减少交易在强势市会少赚，<b>不代表未来下跌市也失效</b>——下跌市里 full 空仓/护栏可能重新占优，需用未来数据再验证。early-March 因 HS300 缓存自 2/25 起、MA20 斜率有约 3 周暖机（按 NaN 不跳过），对结论影响很小。数据截至 ${esc(DATA.bt.data_range||'最新')}。</div></div>`;
   } else {
     h+=`<div class="card"><div class="card-t">熊市过滤方案对比</div>
